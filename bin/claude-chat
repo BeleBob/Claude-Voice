@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# One command to bring Claude into the voice chat: start the devices and
+# services, then open Claude Code in this repo already listening.
+set -euo pipefail
+repo=$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)
+claude-voice on
+cd "$repo"
+exec claude "Зайди в голосовой чат"

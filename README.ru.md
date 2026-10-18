@@ -29,6 +29,7 @@ claude-voice on
 | Команда | Что делает |
 |---|---|
 | `claude-voice on\|off\|status` | включить/выключить устройства, whisper-server и распознавание |
+| `claude-chat` | `claude-voice on` и сразу Claude Code в режиме голосового чата |
 | `claude-say "текст"` | сказать в Claude Mic (и в наушники при `MONITOR=1`) |
 | `claude-listen` | ждать фразу с обращением («Клод, …») и вывести её с контекстом |
 | `claude-listen --all` | ждать любую фразу |

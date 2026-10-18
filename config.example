@@ -22,7 +22,7 @@ WHISPER_URL=http://127.0.0.1:8178/inference
 
 # Comma-separated wake words. claude-listen returns only phrases containing one
 # of them unless called with --all. Matching ignores case.
-WAKE_WORDS=клод,клот,клоуд,клауд,claude
+WAKE_WORDS=клод,клот,клоуд,клауд,claude,clot,cloud,clod
 
 # Voice activity detection: RMS level (0..32767) that counts as speech, and how
 # long a pause (ms) ends a phrase.

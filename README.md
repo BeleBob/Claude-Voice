@@ -42,6 +42,7 @@ real devices afterwards.
 | Command | What it does |
 |---|---|
 | `claude-voice on\|off\|status` | start/stop the devices, whisper-server and transcriber |
+| `claude-chat` | `claude-voice on`, then open Claude Code here already listening |
 | `claude-say "text"` | speak into Claude Mic (and your headphones with `MONITOR=1`) |
 | `claude-listen` | wait for a phrase with a wake word, print it with recent context |
 | `claude-listen --all` | return on any phrase |
