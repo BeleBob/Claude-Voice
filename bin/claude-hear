@@ -113,7 +113,7 @@ def is_noise(text):
 def transcriber(phrases, url, language):
     os.makedirs(STATE_DIR, exist_ok=True)
     while True:
-        started, pcm = phrases.get()
+        who, started, pcm = phrases.get()
         try:
             text = transcribe(url, language, pcm).strip("«»\"' ")
         except Exception as e:  # keep listening if the server hiccups
@@ -122,14 +122,13 @@ def transcriber(phrases, url, language):
         if is_noise(text):
             continue
         with open(TRANSCRIPT, "a", encoding="utf-8") as f:
-            f.write(json.dumps({"ts": started, "who": "chat", "text": text}, ensure_ascii=False) + "\n")
-        print(f"chat: {text}", flush=True)
+            f.write(json.dumps({"ts": started, "who": who, "text": text}, ensure_ascii=False) + "\n")
+        print(f"{who}: {text}", flush=True)
 
 
-def capture(phrases, threshold, silence_ms):
+def capture(phrases, who, target, props, threshold, silence_ms):
     cmd = [
-        "pw-record", "--target", "voice_chat",
-        "-P", "{ stream.capture.sink=true node.name=claude_hear }",
+        "pw-record", "--target", target, "-P", props,
         "--rate", str(RATE), "--channels", "1", "--format", "s16", "--raw", "-",
     ]
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE)
@@ -163,7 +162,7 @@ def capture(phrases, threshold, silence_ms):
             too_long = len(phrase) >= MAX_PHRASE_S * RATE * 2
             if quiet_frames * FRAME_MS >= silence_ms or too_long:
                 if speech_frames * FRAME_MS >= MIN_SPEECH_MS:
-                    phrases.put((started, bytes(phrase)))
+                    phrases.put((who, started, bytes(phrase)))
                 phrase = None
                 loud_run = 0
                 preroll.clear()
@@ -182,9 +181,29 @@ def main():
     ).start()
     threshold = float(conf.get("VAD_THRESHOLD", "500"))
     silence_ms = int(conf.get("VAD_SILENCE_MS", "800"))
+    sources = [
+        # Other people: everything Discord/Steam play into Voice Chat.
+        ("chat", "voice_chat", "{ stream.capture.sink=true node.name=claude_hear }"),
+    ]
+    if conf.get("MIC_SOURCE"):
+        # The user: voice chat apps never play your own microphone back.
+        sources.append(("user", conf["MIC_SOURCE"], "{ node.name=claude_hear_mic }"))
+    for who, target, props in sources:
+        threading.Thread(target=keep_capturing, args=(phrases, who, target, props, threshold, silence_ms)).start()
+
+
+def source_exists(name):
+    out = subprocess.run(["pactl", "list", "short", "sources"], capture_output=True, text=True).stdout
+    return any(line.split("\t")[1:2] == [name] for line in out.splitlines())
+
+
+def keep_capturing(phrases, who, target, props, threshold, silence_ms):
     while True:
-        capture(phrases, threshold, silence_ms)
-        print("claude-hear: recorder stopped, restarting", file=sys.stderr, flush=True)
+        # pw-record falls back to the default source when the target is missing,
+        # which could be Claude Mic itself; wait for the real device instead.
+        if target == "voice_chat" or source_exists(target):
+            capture(phrases, who, target, props, threshold, silence_ms)
+        print(f"claude-hear: recorder for {who} stopped, restarting", file=sys.stderr, flush=True)
         time.sleep(2)
 
 

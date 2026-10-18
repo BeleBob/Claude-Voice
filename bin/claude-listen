@@ -59,7 +59,7 @@ def all_entries():
 
 
 def fmt(entry):
-    who = "Claude" if entry.get("who") == "claude" else "чат"
+    who = {"claude": "Claude", "user": "владелец"}.get(entry.get("who"), "чат")
     return f"[{time.strftime('%H:%M:%S', time.localtime(entry['ts']))}] {who}: {entry['text']}"
 
 
@@ -96,7 +96,7 @@ def main():
         entries, new_offset = read_entries(offset)
         hits = [
             e for e in entries
-            if e.get("who") == "chat" and (args.all or any(w in e["text"].lower() for w in wake))
+            if e.get("who") in ("chat", "user") and (args.all or any(w in e["text"].lower() for w in wake))
         ]
         offset = new_offset
         with open(OFFSET, "w") as f:
