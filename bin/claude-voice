@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# Turn claude-voice on or off, or show its state.
+set -euo pipefail
+
+case ${1:-status} in
+    on)
+        systemctl --user start claude-voice.target
+        echo "In Discord/Steam pick input \"Claude Mic\" and output \"Voice Chat\"."
+        ;;
+    off)
+        systemctl --user stop claude-voice.target
+        echo "Switch Discord/Steam back to your real microphone and headphones."
+        ;;
+    status)
+        systemctl --user --no-pager status claude-voice-devices claude-whisper claude-hear | grep -E '●|Active:' ;;
+    *)
+        echo "usage: claude-voice on|off|status" >&2
+        exit 1
+        ;;
+esac

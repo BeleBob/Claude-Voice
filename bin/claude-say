@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# Speak text into Claude Mic (and, with MONITOR=1, the default output).
+# Usage: claude-say "text"   or   echo "text" | claude-say
+set -euo pipefail
+
+conf=${XDG_CONFIG_HOME:-$HOME/.config}/claude-voice/config
+# shellcheck source=/dev/null
+[[ -f $conf ]] && . "$conf"
+data=${XDG_DATA_HOME:-$HOME/.local/share}/claude-voice
+state=${XDG_STATE_HOME:-$HOME/.local/state}/claude-voice
+
+text=${*:-$(cat)}
+[[ -n ${text// } ]] || { echo "claude-say: empty text" >&2; exit 1; }
+
+wav=$(mktemp --suffix=.wav)
+trap 'rm -f "$wav"' EXIT
+
+printf '%s\n' "$text" | "$data/venv/bin/piper" \
+    -m "$data/voices/${VOICE:-ru_RU-denis-medium}.onnx" \
+    --length-scale "${LENGTH_SCALE:-1.0}" -f "$wav" 2>/dev/null
+
+mkdir -p "$state"
+python3 - "$state/transcript.jsonl" "$text" <<'EOF'
+import json, sys, time
+with open(sys.argv[1], "a", encoding="utf-8") as f:
+    f.write(json.dumps({"ts": time.time(), "who": "claude", "text": sys.argv[2]},
+                       ensure_ascii=False) + "\n")
+EOF
+
+pw-play --target claude_mic_mix "$wav" &
+if [[ ${MONITOR:-1} == 1 ]]; then
+    pw-play "$wav" &
+fi
+wait

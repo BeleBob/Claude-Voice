@@ -1,0 +1,9 @@
+[Unit]
+Description=claude-voice transcriber for the Voice Chat sink
+After=claude-voice-devices.service claude-whisper.service
+PartOf=claude-voice.target
+
+[Service]
+ExecStart=%h/.local/bin/claude-hear
+Restart=on-failure
+RestartSec=2

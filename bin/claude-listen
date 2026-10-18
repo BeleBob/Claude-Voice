@@ -1,0 +1,117 @@
+#!/usr/bin/env python3
+"""Wait for a new phrase in the voice chat transcript and print it.
+
+By default only phrases that contain a wake word count; earlier lines from the
+last --context seconds are printed too, so Claude sees what led up to it.
+Exit codes: 0 phrase printed, 2 timeout.
+"""
+
+import argparse
+import json
+import os
+import sys
+import time
+
+STATE_DIR = os.path.join(
+    os.environ.get("XDG_STATE_HOME", os.path.expanduser("~/.local/state")), "claude-voice"
+)
+TRANSCRIPT = os.path.join(STATE_DIR, "transcript.jsonl")
+OFFSET = os.path.join(STATE_DIR, "listen.offset")
+
+
+def load_wake_words():
+    path = os.path.join(
+        os.environ.get("XDG_CONFIG_HOME", os.path.expanduser("~/.config")),
+        "claude-voice",
+        "config",
+    )
+    words = "клод,claude"
+    try:
+        with open(path, encoding="utf-8") as f:
+            for line in f:
+                if line.strip().startswith("WAKE_WORDS="):
+                    words = line.split("=", 1)[1].strip().strip("\"'")
+    except FileNotFoundError:
+        pass
+    return [w.strip().lower() for w in words.split(",") if w.strip()]
+
+
+def read_entries(start):
+    """Return (entries, end_offset) for complete lines after byte offset start."""
+    try:
+        with open(TRANSCRIPT, "rb") as f:
+            f.seek(start)
+            data = f.read()
+    except FileNotFoundError:
+        return [], 0
+    end = data.rfind(b"\n") + 1
+    entries = []
+    for line in data[:end].splitlines():
+        try:
+            entries.append(json.loads(line))
+        except ValueError:
+            continue
+    return entries, start + end
+
+
+def all_entries():
+    return read_entries(0)[0]
+
+
+def fmt(entry):
+    who = "Claude" if entry.get("who") == "claude" else "чат"
+    return f"[{time.strftime('%H:%M:%S', time.localtime(entry['ts']))}] {who}: {entry['text']}"
+
+
+def main():
+    p = argparse.ArgumentParser(description=__doc__)
+    p.add_argument("--all", action="store_true", help="return on any phrase, not only wake words")
+    p.add_argument("--timeout", type=float, default=0, help="seconds to wait, 0 = forever")
+    p.add_argument("--context", type=float, default=60, help="seconds of earlier transcript to show")
+    p.add_argument("--recent", action="store_true", help="print the last --context seconds and exit")
+    args = p.parse_args()
+
+    if args.recent:
+        cutoff = time.time() - args.context
+        for e in all_entries():
+            if e["ts"] >= cutoff:
+                print(fmt(e))
+        return 0
+
+    os.makedirs(STATE_DIR, exist_ok=True)
+    try:
+        with open(OFFSET) as f:
+            offset = int(f.read().strip() or 0)
+    except (FileNotFoundError, ValueError):
+        offset = read_entries(0)[1]  # first run: only new phrases count
+    try:
+        if offset > os.path.getsize(TRANSCRIPT):
+            offset = 0  # transcript was rotated or cleared
+    except FileNotFoundError:
+        offset = 0
+
+    wake = load_wake_words()
+    deadline = time.monotonic() + args.timeout if args.timeout else None
+    while True:
+        entries, new_offset = read_entries(offset)
+        hits = [
+            e for e in entries
+            if e.get("who") == "chat" and (args.all or any(w in e["text"].lower() for w in wake))
+        ]
+        offset = new_offset
+        with open(OFFSET, "w") as f:
+            f.write(str(offset))
+        if hits:
+            cutoff = hits[0]["ts"] - args.context
+            for e in all_entries():
+                if e["ts"] >= cutoff:
+                    print(fmt(e))
+            return 0
+        if deadline and time.monotonic() >= deadline:
+            print("timeout: no new phrases", file=sys.stderr)
+            return 2
+        time.sleep(0.3)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

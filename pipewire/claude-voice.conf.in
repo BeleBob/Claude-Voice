@@ -1,0 +1,80 @@
+# Standalone PipeWire client that creates the claude-voice virtual devices.
+# Run it with `pipewire -c <this file>` (see systemd/claude-voice-devices.service);
+# the devices exist while the process runs, the main PipeWire is not touched.
+#
+# @MIC_SOURCE@ is replaced by install.sh with the node name of the real microphone.
+
+context.properties = {
+    log.level = 0
+}
+
+context.spa-libs = {
+    audio.convert.* = audioconvert/libspa-audioconvert
+    support.*       = support/libspa-support
+}
+
+context.modules = [
+    { name = libpipewire-module-rt
+        args = { }
+        flags = [ ifexists nofail ]
+    }
+    { name = libpipewire-module-protocol-native }
+    { name = libpipewire-module-client-node }
+    { name = libpipewire-module-adapter }
+
+    # "Claude Mic": a sink that mixes the real microphone and Claude's speech,
+    # exposed to apps as a microphone. Pick it as the input in Discord/Steam.
+    { name = libpipewire-module-loopback
+        args = {
+            node.description = "Claude Mic"
+            audio.position = [ MONO ]
+            capture.props = {
+                node.name = "claude_mic_mix"
+                node.description = "Claude Mic (mix)"
+                media.class = "Audio/Sink"
+            }
+            playback.props = {
+                node.name = "claude_mic"
+                node.description = "Claude Mic"
+                media.class = "Audio/Source"
+            }
+        }
+    }
+
+    # Real microphone -> Claude Mic mix. Pinned to the real device so it can
+    # never fall back to Claude Mic itself and loop.
+    { name = libpipewire-module-loopback
+        args = {
+            node.description = "Microphone to Claude Mic"
+            audio.position = [ MONO ]
+            capture.props = {
+                node.name = "claude_mic_passthrough"
+                target.object = "@MIC_SOURCE@"
+                node.dont-fallback = true
+                node.dont-reconnect = false
+            }
+            playback.props = {
+                node.name = "claude_mic_passthrough_out"
+                target.object = "claude_mic_mix"
+                node.dont-fallback = true
+            }
+        }
+    }
+
+    # "Voice Chat": pick it as the output in Discord/Steam. Audio is forwarded
+    # to the default output; claude-hear records its monitor.
+    { name = libpipewire-module-loopback
+        args = {
+            node.description = "Voice Chat"
+            audio.position = [ FL FR ]
+            capture.props = {
+                node.name = "voice_chat"
+                node.description = "Voice Chat"
+                media.class = "Audio/Sink"
+            }
+            playback.props = {
+                node.name = "voice_chat_out"
+            }
+        }
+    }
+]

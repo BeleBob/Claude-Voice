@@ -1,0 +1,9 @@
+[Unit]
+Description=claude-voice virtual devices (Claude Mic, Voice Chat)
+After=pipewire.service
+Requires=pipewire.service
+PartOf=claude-voice.target
+
+[Service]
+ExecStart=/usr/bin/pipewire -c %h/.config/claude-voice/pipewire.conf
+Restart=on-failure

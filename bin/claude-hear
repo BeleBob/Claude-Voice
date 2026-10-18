@@ -1,0 +1,192 @@
+#!/usr/bin/env python3
+"""Transcribe everything played into the "Voice Chat" sink.
+
+Records the sink monitor with pw-record, splits speech into phrases with a
+simple energy-based VAD, sends each phrase to whisper-server and appends the
+text to ~/.local/state/claude-voice/transcript.jsonl.
+"""
+
+import array
+import io
+import json
+import math
+import os
+import queue
+import subprocess
+import sys
+import threading
+import time
+import urllib.request
+import uuid
+import wave
+from collections import deque
+
+RATE = 16000
+FRAME_MS = 30
+FRAME_BYTES = RATE * FRAME_MS // 1000 * 2  # s16 mono
+PREROLL_MS = 300
+START_FRAMES = 2  # consecutive loud frames that start a phrase
+MIN_SPEECH_MS = 400
+MAX_PHRASE_S = 30
+
+# Phrases Whisper tends to invent on noise or silence.
+HALLUCINATIONS = (
+    "продолжение следует",
+    "субтитры",
+    "спасибо за просмотр",
+    "редактор субтитров",
+    "thank you for watching",
+)
+
+STATE_DIR = os.path.join(
+    os.environ.get("XDG_STATE_HOME", os.path.expanduser("~/.local/state")), "claude-voice"
+)
+TRANSCRIPT = os.path.join(STATE_DIR, "transcript.jsonl")
+
+
+def load_config():
+    path = os.path.join(
+        os.environ.get("XDG_CONFIG_HOME", os.path.expanduser("~/.config")),
+        "claude-voice",
+        "config",
+    )
+    conf = {}
+    try:
+        with open(path, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                key, value = line.split("=", 1)
+                conf[key.strip()] = value.strip().strip("\"'")
+    except FileNotFoundError:
+        pass
+    return conf
+
+
+def rms(frame):
+    samples = array.array("h")
+    samples.frombytes(frame)
+    return math.sqrt(sum(s * s for s in samples) / len(samples))
+
+
+def to_wav(pcm):
+    buf = io.BytesIO()
+    with wave.open(buf, "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(RATE)
+        w.writeframes(pcm)
+    return buf.getvalue()
+
+
+def transcribe(url, language, pcm):
+    boundary = uuid.uuid4().hex
+    fields = {"response_format": "json", "language": language, "temperature": "0"}
+    body = io.BytesIO()
+    for name, value in fields.items():
+        body.write(
+            f'--{boundary}\r\nContent-Disposition: form-data; name="{name}"\r\n\r\n'
+            f"{value}\r\n".encode()
+        )
+    body.write(
+        f'--{boundary}\r\nContent-Disposition: form-data; name="file"; '
+        f'filename="phrase.wav"\r\nContent-Type: audio/wav\r\n\r\n'.encode()
+    )
+    body.write(to_wav(pcm))
+    body.write(f"\r\n--{boundary}--\r\n".encode())
+    req = urllib.request.Request(
+        url,
+        data=body.getvalue(),
+        headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
+    )
+    with urllib.request.urlopen(req, timeout=60) as resp:
+        return json.load(resp).get("text", "").strip()
+
+
+def is_noise(text):
+    lowered = text.lower()
+    letters = sum(c.isalpha() for c in text)
+    return letters < 2 or any(h in lowered for h in HALLUCINATIONS)
+
+
+def transcriber(phrases, url, language):
+    os.makedirs(STATE_DIR, exist_ok=True)
+    while True:
+        started, pcm = phrases.get()
+        try:
+            text = transcribe(url, language, pcm).strip("«»\"' ")
+        except Exception as e:  # keep listening if the server hiccups
+            print(f"claude-hear: transcription failed: {e}", file=sys.stderr, flush=True)
+            continue
+        if is_noise(text):
+            continue
+        with open(TRANSCRIPT, "a", encoding="utf-8") as f:
+            f.write(json.dumps({"ts": started, "who": "chat", "text": text}, ensure_ascii=False) + "\n")
+        print(f"chat: {text}", flush=True)
+
+
+def capture(phrases, threshold, silence_ms):
+    cmd = [
+        "pw-record", "--target", "voice_chat",
+        "-P", "{ stream.capture.sink=true node.name=claude_hear }",
+        "--rate", str(RATE), "--channels", "1", "--format", "s16", "--raw", "-",
+    ]
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE)
+    preroll = deque(maxlen=PREROLL_MS // FRAME_MS)
+    phrase = None
+    loud_run = 0
+    quiet_frames = 0
+    speech_frames = 0
+    started = 0.0
+    try:
+        while True:
+            frame = proc.stdout.read(FRAME_BYTES)
+            if len(frame) < FRAME_BYTES:
+                return  # pw-record exited
+            loud = rms(frame) >= threshold
+            if phrase is None:
+                preroll.append(frame)
+                loud_run = loud_run + 1 if loud else 0
+                if loud_run >= START_FRAMES:
+                    phrase = bytearray(b"".join(preroll))
+                    started = time.time() - len(preroll) * FRAME_MS / 1000
+                    speech_frames = loud_run
+                    quiet_frames = 0
+                continue
+            phrase += frame
+            if loud:
+                speech_frames += 1
+                quiet_frames = 0
+            else:
+                quiet_frames += 1
+            too_long = len(phrase) >= MAX_PHRASE_S * RATE * 2
+            if quiet_frames * FRAME_MS >= silence_ms or too_long:
+                if speech_frames * FRAME_MS >= MIN_SPEECH_MS:
+                    phrases.put((started, bytes(phrase)))
+                phrase = None
+                loud_run = 0
+                preroll.clear()
+    finally:
+        proc.kill()
+        proc.wait()
+
+
+def main():
+    conf = load_config()
+    phrases = queue.Queue()
+    threading.Thread(
+        target=transcriber,
+        args=(phrases, conf.get("WHISPER_URL", "http://127.0.0.1:8178/inference"), conf.get("LANGUAGE", "ru")),
+        daemon=True,
+    ).start()
+    threshold = float(conf.get("VAD_THRESHOLD", "500"))
+    silence_ms = int(conf.get("VAD_SILENCE_MS", "800"))
+    while True:
+        capture(phrases, threshold, silence_ms)
+        print("claude-hear: recorder stopped, restarting", file=sys.stderr, flush=True)
+        time.sleep(2)
+
+
+if __name__ == "__main__":
+    main()
