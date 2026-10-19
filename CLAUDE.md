@@ -34,6 +34,6 @@ Speech rules:
   `~/.local/bin` and user systemd units; `./install.sh` is idempotent.
 - After changes: `bash -n` / `python3 -m py_compile` the scripts, re-run
   `./install.sh`, `systemctl --user restart claude-voice.target`, then the
-  checks in README (hear test via `pw-play --target voice_chat`, mic level via
+  checks in `.github/README.md` (hear test via `pw-play --target voice_chat`, mic level via
   `pw-record --target claude_mic`).
 - Never restart the main PipeWire/WirePlumber: the user may be in a call.
