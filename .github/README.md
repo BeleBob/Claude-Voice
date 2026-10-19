@@ -146,7 +146,7 @@ pw-record --target claude_mic --rate 16000 --channels 1 --raw /tmp/mic.raw & cla
 
 ## Contributing
 Сообщения об ошибках и предложения принимаются через
-[Issues](https://github.com/BeleBob/claude-voice/issues). Изменения предлагаются
+[Issues](https://github.com/BeleBob/Claude-Voice/issues). Изменения предлагаются
 через pull request в ветку `main`; перед отправкой пройди шаги из раздела
 [Тестирование](#тестирование).
 
