@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# One command to bring Claude into the voice chat: start the devices and
+# services, then open Claude Code in this repo already listening.
+set -euo pipefail
+repo=$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)
+conf=${XDG_CONFIG_HOME:-$HOME/.config}/claude-voice/config
+# shellcheck source=/dev/null
+[[ -f $conf ]] && . "$conf"
+
+"$repo/bin/claude-voice" on
+cd "$repo"
+prompt="Зайди в голосовой чат"
+cmd=${CLAUDE_CMD:-claude}
+status=0
+if type -P "$cmd" >/dev/null; then
+    "$cmd" "$prompt" || status=$?
+else
+    # CLAUDE_CMD is an alias, a function or has arguments: those only work in
+    # the user's interactive shell (and PATH may lack ~/.local/bin when started
+    # from the tray).
+    shell=${SHELL:-$(getent passwd "$(id -un)" | cut -d: -f7)}
+    "${shell:-/bin/bash}" -ic "$cmd \"\$0\"" "$prompt" || status=$?
+fi
+if ((status != 0)); then
+    # Keep the terminal the tray opened from vanishing with the error.
+    echo "claude-chat: '$cmd' exited with code $status (127: not found, check CLAUDE_CMD in $conf)" >&2
+    [[ -t 0 ]] && read -rp "Press Enter to close. " _
+fi
+exit "$status"

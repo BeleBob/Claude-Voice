@@ -1,0 +1,51 @@
+# claude-voice settings, installed to ~/.config/claude-voice/config.
+# Sourced by bash (claude-say) and parsed as KEY=value by the Python tools.
+
+# Piper voice file name in ~/.local/share/claude-voice/voices, without .onnx.
+VOICE=ru_RU-denis-medium
+
+# Speech speed for Piper: below 1.0 is faster, above is slower.
+LENGTH_SCALE=1.0
+
+# Also play Claude's speech in your own headphones (1) or only into Claude Mic (0).
+MONITOR=1
+
+# Node name of the real microphone that is mixed into Claude Mic.
+# List candidates with: pactl list sources short
+MIC_SOURCE=alsa_input.usb-1532_Razer_Barracuda_X_2.4_O001000008-00.mono-fallback
+
+# Language for Whisper.
+LANGUAGE=ru
+
+# whisper-server address (claude-whisper.service).
+WHISPER_URL=http://127.0.0.1:8178/inference
+
+# Comma-separated wake words. claude-listen returns only phrases containing one
+# of them unless called with --all. Matching ignores case.
+WAKE_WORDS=клод,клот,клоуд,клауд,claude,clot,cloud,clod
+
+# Voice activity detection: RMS level (0..32767) that counts as speech, and how
+# long a pause (ms) ends a phrase.
+VAD_THRESHOLD=500
+VAD_SILENCE_MS=800
+
+# Hours of transcript kept in ~/.local/state/claude-voice/transcript.jsonl;
+# older phrases are deleted. 0 keeps everything.
+TRANSCRIPT_KEEP_HOURS=24
+
+# Command that starts Claude Code for claude-chat and the tray. Aliases from
+# your interactive shell work too.
+CLAUDE_CMD=claude
+
+# Terminal the tray opens claude-chat in; the command is appended.
+TERMINAL="konsole -e"
+
+# Local speech filter, applied before anything is written to the transcript, so
+# filtered speech never reaches Claude. Swear words are replaced with ***;
+# phrases the model scores at or above FILTER_THRESHOLD for one of
+# FILTER_LABELS are dropped. Labels: insult, threat, dangerous. "threat" also
+# hides game talk like "убей его, он слева"; "dangerous" is noisy.
+# FILTER=0 turns it off.
+FILTER=1
+FILTER_LABELS=insult
+FILTER_THRESHOLD=0.5

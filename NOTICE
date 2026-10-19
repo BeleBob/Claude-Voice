@@ -1,0 +1,55 @@
+Third-Party Licenses
+====================
+
+This repository contains no third-party code apart from icons/claude.svg
+(below). install.sh downloads and builds the following software and models;
+each comes under its own license.
+
+------------------------------------------------------------------------------
+icons/claude.svg
+https://simpleicons.org (simple-icons 16.35.0)
+The SVG file is released under CC0 1.0. The Claude logo is a trademark of
+Anthropic PBC; it is used here only to identify Claude Code.
+
+------------------------------------------------------------------------------
+Piper (piper-tts)
+https://github.com/OHF-Voice/piper1-gpl
+Licensed under the GNU General Public License v3.0 or later.
+
+------------------------------------------------------------------------------
+Piper voices
+https://huggingface.co/rhasspy/piper-voices
+Each voice is trained on its own dataset; see its MODEL_CARD.
+  ru_RU-denis-medium   dataset license: CC0
+  ru_RU-dmitri-medium  dataset license: CC0
+  ru_RU-irina-medium   dataset license: unknown (RHVoice)
+  ru_RU-ruslan-medium  dataset license: CC BY-NC-SA 4.0 (non-commercial)
+
+------------------------------------------------------------------------------
+whisper.cpp
+https://github.com/ggml-org/whisper.cpp
+Copyright (c) 2023-2026 The ggml authors.
+Licensed under the MIT License.
+
+------------------------------------------------------------------------------
+Whisper large-v3-turbo model (ggml conversion)
+https://github.com/openai/whisper
+Copyright (c) 2022 OpenAI.
+Licensed under the MIT License.
+
+------------------------------------------------------------------------------
+rubert-tiny-toxicity (ONNX conversion by onnx-community)
+https://huggingface.co/cointegrated/rubert-tiny-toxicity
+https://huggingface.co/onnx-community/rubert-tiny-toxicity-ONNX
+Licensed under the MIT License.
+
+------------------------------------------------------------------------------
+tokenizers
+https://github.com/huggingface/tokenizers
+Licensed under the Apache License, Version 2.0.
+
+------------------------------------------------------------------------------
+SPIRV-Headers
+https://github.com/KhronosGroup/SPIRV-Headers
+Copyright (c) 2015-2024 The Khronos Group Inc.
+Licensed under the MIT License.

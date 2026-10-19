@@ -1,0 +1,147 @@
+#!/usr/bin/env python3
+"""Wait for a new phrase in the voice chat transcript and print it.
+
+By default only phrases that contain a wake word count; earlier lines from the
+last --context seconds are printed too, so Claude sees what led up to it.
+Phrases said more than --max-age seconds before the start don't count: they
+were said while Claude wasn't listening.
+Exit codes: 0 phrase printed, 2 timeout.
+"""
+
+import argparse
+import json
+import os
+import sys
+import time
+
+STATE_DIR = os.path.join(
+    os.environ.get("XDG_STATE_HOME", os.path.expanduser("~/.local/state")), "claude-voice"
+)
+TRANSCRIPT = os.path.join(STATE_DIR, "transcript.jsonl")
+OFFSET = os.path.join(STATE_DIR, "listen.offset")
+
+
+def load_position():
+    """Return (byte offset, ts of the last phrase read) or None on first run."""
+    try:
+        with open(OFFSET) as f:
+            parts = f.read().split()
+        return int(parts[0]), float(parts[1]) if len(parts) > 1 else 0.0
+    except (FileNotFoundError, ValueError, IndexError):
+        return None
+
+
+def save_position(offset, last_ts):
+    with open(OFFSET, "w") as f:
+        f.write(f"{offset} {last_ts}")
+
+
+def load_wake_words():
+    path = os.path.join(
+        os.environ.get("XDG_CONFIG_HOME", os.path.expanduser("~/.config")),
+        "claude-voice",
+        "config",
+    )
+    words = "клод,claude"
+    try:
+        with open(path, encoding="utf-8") as f:
+            for line in f:
+                if line.strip().startswith("WAKE_WORDS="):
+                    words = line.split("=", 1)[1].strip().strip("\"'")
+    except FileNotFoundError:
+        pass
+    return [w.strip().lower() for w in words.split(",") if w.strip()]
+
+
+def read_entries(start):
+    """Return (entries, end_offset) for complete lines after byte offset start."""
+    try:
+        with open(TRANSCRIPT, "rb") as f:
+            f.seek(start)
+            data = f.read()
+    except FileNotFoundError:
+        return [], 0
+    end = data.rfind(b"\n") + 1
+    entries = []
+    for line in data[:end].splitlines():
+        try:
+            entries.append(json.loads(line))
+        except ValueError:
+            continue
+    return entries, start + end
+
+
+def all_entries():
+    return read_entries(0)[0]
+
+
+def fmt(entry):
+    who = {"claude": "Claude", "user": "владелец"}.get(entry.get("who"), "чат")
+    return f"[{time.strftime('%H:%M:%S', time.localtime(entry['ts']))}] {who}: {entry['text']}"
+
+
+def main():
+    p = argparse.ArgumentParser(description=__doc__)
+    p.add_argument("--all", action="store_true", help="return on any phrase, not only wake words")
+    p.add_argument("--timeout", type=float, default=0, help="seconds to wait, 0 = forever")
+    p.add_argument("--context", type=float, default=60, help="seconds of earlier transcript to show")
+    p.add_argument("--recent", action="store_true", help="print the last --context seconds and exit")
+    p.add_argument(
+        "--max-age", type=float, default=120,
+        help="ignore phrases said this many seconds before the start (covers the "
+        "pause while Claude answers between two runs)",
+    )
+    args = p.parse_args()
+
+    if args.recent:
+        cutoff = time.time() - args.context
+        for e in all_entries():
+            if e["ts"] >= cutoff:
+                print(fmt(e))
+        return 0
+
+    os.makedirs(STATE_DIR, exist_ok=True)
+    min_ts = time.time() - args.max_age
+    position = load_position()
+    if position is None:
+        offset, last_ts = read_entries(0)[1], time.time()  # first run: only new phrases count
+    else:
+        offset, last_ts = position
+
+    wake = load_wake_words()
+    deadline = time.monotonic() + args.timeout if args.timeout else None
+    while True:
+        try:
+            size = os.path.getsize(TRANSCRIPT)
+        except FileNotFoundError:
+            size = 0
+        pruned = offset > size  # claude-hear dropped old lines, or the file was cleared
+        if pruned:
+            offset = 0
+        entries, new_offset = read_entries(offset)
+        if pruned:
+            entries = [e for e in entries if e["ts"] > last_ts]  # already seen before
+        if entries:
+            last_ts = max(last_ts, max(e["ts"] for e in entries))
+        hits = [
+            e for e in entries
+            if e.get("who") in ("chat", "user")
+            and e["ts"] >= min_ts
+            and (args.all or any(w in e["text"].lower() for w in wake))
+        ]
+        offset = new_offset
+        save_position(offset, last_ts)
+        if hits:
+            cutoff = hits[0]["ts"] - args.context
+            for e in all_entries():
+                if e["ts"] >= cutoff:
+                    print(fmt(e))
+            return 0
+        if deadline and time.monotonic() >= deadline:
+            print("timeout: no new phrases", file=sys.stderr)
+            return 2
+        time.sleep(0.3)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

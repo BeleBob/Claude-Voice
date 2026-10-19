@@ -1,0 +1,275 @@
+#!/usr/bin/env python3
+"""Transcribe everything played into the "Voice Chat" sink.
+
+Records the sink monitor with pw-record, splits speech into phrases with a
+simple energy-based VAD, sends each phrase to whisper-server and appends the
+text to ~/.local/state/claude-voice/transcript.jsonl. With FILTER=1 swearing is
+masked and insults are dropped before they are written (lib/speech_filter.py),
+so they never reach Claude.
+"""
+
+import array
+import io
+import json
+import math
+import os
+import queue
+import subprocess
+import sys
+import threading
+import time
+import urllib.request
+import uuid
+import wave
+from collections import deque
+
+RATE = 16000
+FRAME_MS = 30
+FRAME_BYTES = RATE * FRAME_MS // 1000 * 2  # s16 mono
+PREROLL_MS = 300
+START_FRAMES = 2  # consecutive loud frames that start a phrase
+MIN_SPEECH_MS = 400
+MAX_PHRASE_S = 30
+
+# Phrases Whisper tends to invent on noise or silence.
+HALLUCINATIONS = (
+    "продолжение следует",
+    "субтитры",
+    "спасибо за просмотр",
+    "редактор субтитров",
+    "thank you for watching",
+)
+
+STATE_DIR = os.path.join(
+    os.environ.get("XDG_STATE_HOME", os.path.expanduser("~/.local/state")), "claude-voice"
+)
+TRANSCRIPT = os.path.join(STATE_DIR, "transcript.jsonl")
+DATA_DIR = os.path.join(
+    os.environ.get("XDG_DATA_HOME", os.path.expanduser("~/.local/share")), "claude-voice"
+)
+FILTER_MODEL = os.path.join(DATA_DIR, "models", "toxicity")
+PRUNE_EVERY_S = 3600
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "lib"))
+
+
+def load_config():
+    path = os.path.join(
+        os.environ.get("XDG_CONFIG_HOME", os.path.expanduser("~/.config")),
+        "claude-voice",
+        "config",
+    )
+    conf = {}
+    try:
+        with open(path, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                key, value = line.split("=", 1)
+                conf[key.strip()] = value.strip().strip("\"'")
+    except FileNotFoundError:
+        pass
+    return conf
+
+
+def rms(frame):
+    samples = array.array("h")
+    samples.frombytes(frame)
+    return math.sqrt(sum(s * s for s in samples) / len(samples))
+
+
+def to_wav(pcm):
+    buf = io.BytesIO()
+    with wave.open(buf, "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(RATE)
+        w.writeframes(pcm)
+    return buf.getvalue()
+
+
+def transcribe(url, language, pcm):
+    boundary = uuid.uuid4().hex
+    fields = {"response_format": "json", "language": language, "temperature": "0"}
+    body = io.BytesIO()
+    for name, value in fields.items():
+        body.write(
+            f'--{boundary}\r\nContent-Disposition: form-data; name="{name}"\r\n\r\n'
+            f"{value}\r\n".encode()
+        )
+    body.write(
+        f'--{boundary}\r\nContent-Disposition: form-data; name="file"; '
+        f'filename="phrase.wav"\r\nContent-Type: audio/wav\r\n\r\n'.encode()
+    )
+    body.write(to_wav(pcm))
+    body.write(f"\r\n--{boundary}--\r\n".encode())
+    req = urllib.request.Request(
+        url,
+        data=body.getvalue(),
+        headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
+    )
+    with urllib.request.urlopen(req, timeout=60) as resp:
+        return json.load(resp).get("text", "").strip()
+
+
+def is_noise(text):
+    lowered = text.lower()
+    letters = sum(c.isalpha() for c in text)
+    return letters < 2 or any(h in lowered for h in HALLUCINATIONS)
+
+
+def load_filter(conf):
+    if conf.get("FILTER", "1") == "0":
+        return None
+    from speech_filter import SpeechFilter
+
+    labels = [label.strip() for label in conf.get("FILTER_LABELS", "insult").split(",") if label.strip()]
+    return SpeechFilter(FILTER_MODEL, labels, float(conf.get("FILTER_THRESHOLD", "0.5")))
+
+
+def prune_transcript(keep_hours):
+    """Drop phrases older than keep_hours, so speech doesn't pile up on disk."""
+    cutoff = time.time() - keep_hours * 3600
+    try:
+        with open(TRANSCRIPT, encoding="utf-8") as f:
+            lines = f.readlines()
+    except FileNotFoundError:
+        return
+    kept = []
+    for line in lines:
+        try:
+            if json.loads(line)["ts"] >= cutoff:
+                kept.append(line)
+        except (ValueError, KeyError, TypeError):
+            continue
+    if len(kept) == len(lines):
+        return
+    tmp = TRANSCRIPT + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        f.writelines(kept)
+    os.replace(tmp, TRANSCRIPT)
+    print(f"claude-hear: pruned {len(lines) - len(kept)} old lines", flush=True)
+
+
+def transcriber(phrases, url, language, speech_filter, keep_hours):
+    os.makedirs(STATE_DIR, exist_ok=True)
+    pruned_at = 0.0
+    while True:
+        # Pruning runs here, between writes, so it never races claude-hear itself.
+        if keep_hours > 0 and time.monotonic() - pruned_at >= PRUNE_EVERY_S:
+            prune_transcript(keep_hours)
+            pruned_at = time.monotonic()
+        try:
+            who, started, pcm = phrases.get(timeout=PRUNE_EVERY_S)
+        except queue.Empty:
+            continue
+        try:
+            text = transcribe(url, language, pcm).strip("«»\"' ")
+        except Exception as e:  # keep listening if the server hiccups
+            print(f"claude-hear: transcription failed: {e}", file=sys.stderr, flush=True)
+            continue
+        if is_noise(text):
+            continue
+        if speech_filter:
+            text, dropped = speech_filter.check(text)
+            if dropped:
+                print(f"{who}: phrase hidden ({dropped[0]} {dropped[1]:.2f})", flush=True)
+                continue
+        with open(TRANSCRIPT, "a", encoding="utf-8") as f:
+            f.write(json.dumps({"ts": started, "who": who, "text": text}, ensure_ascii=False) + "\n")
+        print(f"{who}: {text}", flush=True)
+
+
+def capture(phrases, who, target, props, threshold, silence_ms):
+    cmd = [
+        "pw-record", "--target", target, "-P", props,
+        "--rate", str(RATE), "--channels", "1", "--format", "s16", "--raw", "-",
+    ]
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE)
+    preroll = deque(maxlen=PREROLL_MS // FRAME_MS)
+    phrase = None
+    loud_run = 0
+    quiet_frames = 0
+    speech_frames = 0
+    started = 0.0
+    try:
+        while True:
+            frame = proc.stdout.read(FRAME_BYTES)
+            if len(frame) < FRAME_BYTES:
+                return  # pw-record exited
+            loud = rms(frame) >= threshold
+            if phrase is None:
+                preroll.append(frame)
+                loud_run = loud_run + 1 if loud else 0
+                if loud_run >= START_FRAMES:
+                    phrase = bytearray(b"".join(preroll))
+                    started = time.time() - len(preroll) * FRAME_MS / 1000
+                    speech_frames = loud_run
+                    quiet_frames = 0
+                continue
+            phrase += frame
+            if loud:
+                speech_frames += 1
+                quiet_frames = 0
+            else:
+                quiet_frames += 1
+            too_long = len(phrase) >= MAX_PHRASE_S * RATE * 2
+            if quiet_frames * FRAME_MS >= silence_ms or too_long:
+                if speech_frames * FRAME_MS >= MIN_SPEECH_MS:
+                    phrases.put((who, started, bytes(phrase)))
+                phrase = None
+                loud_run = 0
+                preroll.clear()
+    finally:
+        proc.kill()
+        proc.wait()
+
+
+def main():
+    conf = load_config()
+    try:
+        speech_filter = load_filter(conf)
+    except Exception as e:  # fail closed: without the filter nothing is transcribed
+        sys.exit(f"claude-hear: speech filter unavailable ({e}); run install.sh or set FILTER=0")
+    phrases = queue.Queue()
+    threading.Thread(
+        target=transcriber,
+        args=(
+            phrases,
+            conf.get("WHISPER_URL", "http://127.0.0.1:8178/inference"),
+            conf.get("LANGUAGE", "ru"),
+            speech_filter,
+            float(conf.get("TRANSCRIPT_KEEP_HOURS", "24")),
+        ),
+        daemon=True,
+    ).start()
+    threshold = float(conf.get("VAD_THRESHOLD", "500"))
+    silence_ms = int(conf.get("VAD_SILENCE_MS", "800"))
+    sources = [
+        # Other people: everything the voice chat app plays into Voice Chat.
+        ("chat", "voice_chat", "{ stream.capture.sink=true node.name=claude_hear }"),
+    ]
+    if conf.get("MIC_SOURCE"):
+        # The user: voice chat apps never play your own microphone back.
+        sources.append(("user", conf["MIC_SOURCE"], "{ node.name=claude_hear_mic }"))
+    for who, target, props in sources:
+        threading.Thread(target=keep_capturing, args=(phrases, who, target, props, threshold, silence_ms)).start()
+
+
+def source_exists(name):
+    out = subprocess.run(["pactl", "list", "short", "sources"], capture_output=True, text=True).stdout
+    return any(line.split("\t")[1:2] == [name] for line in out.splitlines())
+
+
+def keep_capturing(phrases, who, target, props, threshold, silence_ms):
+    while True:
+        # pw-record falls back to the default source when the target is missing,
+        # which could be Claude Mic itself; wait for the real device instead.
+        if target == "voice_chat" or source_exists(target):
+            capture(phrases, who, target, props, threshold, silence_ms)
+        print(f"claude-hear: recorder for {who} stopped, restarting", file=sys.stderr, flush=True)
+        time.sleep(2)
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,3 @@
+[Unit]
+Description=claude-voice: Claude speaks into Claude Mic and hears Voice Chat
+Wants=claude-voice-devices.service claude-whisper.service claude-hear.service

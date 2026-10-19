@@ -1,0 +1,9 @@
+[Unit]
+Description=claude-voice speech recognition server (whisper.cpp)
+PartOf=claude-voice.target
+
+[Service]
+ExecStart=%h/.local/share/claude-voice/whisper/bin/whisper-server \
+    -m %h/.local/share/claude-voice/models/ggml-large-v3-turbo.bin \
+    --host 127.0.0.1 --port 8178 -l ru -nt -sns
+Restart=on-failure
