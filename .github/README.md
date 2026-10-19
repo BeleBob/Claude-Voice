@@ -1,5 +1,5 @@
 <div align="center">
-  <h1>claude-voice</h1>
+  <h1>Claude-Voice</h1>
   <p>Голос для Claude Code: говорит и слушает в голосовых чатах Discord и Steam, весь звук обрабатывается локально.</p>
   <p>
     <img src="https://img.shields.io/badge/Linux-PipeWire-455a64?style=flat-square&amp;logo=linux&amp;logoColor=white" alt="Linux и PipeWire">
