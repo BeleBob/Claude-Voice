@@ -1,4 +1,4 @@
-# claude-voice
+# Claude-Voice
 
 Lets Claude Code talk in Discord/Steam voice chats: `claude-say` speaks into the
 "Claude Mic" virtual microphone, `claude-hear` transcribes the "Voice Chat"

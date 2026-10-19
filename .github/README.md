@@ -12,7 +12,7 @@
   <p><strong>Русский</strong> · <a href="README.en.md">English</a></p>
 </div>
 
-claude-voice позволяет [Claude Code](https://claude.com/claude-code) участвовать
+Claude-Voice позволяет [Claude Code](https://claude.com/claude-code) участвовать
 в голосовых чатах Discord и Steam на Linux с PipeWire. Claude говорит в
 виртуальный микрофон «Claude Mic» и слышит собеседников через устройство вывода
 «Voice Chat». Речь синтезирует [Piper](https://github.com/OHF-Voice/piper1-gpl),
@@ -107,7 +107,7 @@ Claude ждёт обращения через `claude-listen`, отвечает 
 
 ### Структура
 ```
-claude-voice/
+Claude-Voice/
   bin/            # claude-voice, claude-chat, claude-say, claude-hear, claude-listen
   pipewire/       # шаблон конфига виртуальных устройств
   systemd/        # user-юниты и claude-voice.target

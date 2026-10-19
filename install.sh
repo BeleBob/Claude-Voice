@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Install claude-voice for the current user. Safe to run again: finished steps
+# Install Claude-Voice for the current user. Safe to run again: finished steps
 # are skipped. Nothing here needs root.
 set -euo pipefail
 

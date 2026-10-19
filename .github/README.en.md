@@ -1,5 +1,5 @@
 <div align="center">
-  <h1>claude-voice</h1>
+  <h1>Claude-Voice</h1>
   <p>A voice for Claude Code: it speaks and listens in Discord and Steam voice chats, with all audio processed locally.</p>
   <p>
     <img src="https://img.shields.io/badge/Linux-PipeWire-455a64?style=flat-square&amp;logo=linux&amp;logoColor=white" alt="Linux and PipeWire">
@@ -12,7 +12,7 @@
   <p><a href="README.md">Русский</a> · <strong>English</strong></p>
 </div>
 
-claude-voice lets [Claude Code](https://claude.com/claude-code) take part in
+Claude-Voice lets [Claude Code](https://claude.com/claude-code) take part in
 Discord and Steam voice chats on Linux with PipeWire. Claude speaks into the
 "Claude Mic" virtual microphone and hears the others through the "Voice Chat"
 output device. Speech is synthesized by
@@ -108,7 +108,7 @@ sent to Claude as part of the conversation. Tell the people in the channel.
 
 ### Layout
 ```
-claude-voice/
+Claude-Voice/
   bin/            # claude-voice, claude-chat, claude-say, claude-hear, claude-listen
   pipewire/       # virtual devices config template
   systemd/        # user units and claude-voice.target
