@@ -8,6 +8,7 @@
     <img src="https://img.shields.io/badge/Piper-TTS-455a64?style=flat-square" alt="Piper speech synthesis">
     <img src="https://img.shields.io/badge/Python-3-3776AB?style=flat-square&amp;logo=python&amp;logoColor=white" alt="Python 3">
     <img src="https://img.shields.io/badge/root-not_required-2E7D32?style=flat-square" alt="No root required">
+    <a href="../LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0--or--later-blue?style=flat-square" alt="GPL-3.0-or-later license"></a>
   </p>
   <p><a href="README.md">Русский</a> · <strong>English</strong></p>
 </div>
@@ -39,6 +40,7 @@ Discord / Steam (output) ──► Voice Chat ──► your headphones
 - [Contributing](#contributing)
 - [To do](#to-do)
 - [Third-party components](#third-party-components)
+- [License](#license)
 
 ## Features
 - **Virtual devices.** A separate PipeWire instance creates "Claude Mic" and
@@ -168,4 +170,9 @@ one.
 - [PipeWire](https://pipewire.org) — virtual devices.
 
 The components are downloaded by the installer and come under their own
-licenses.
+licenses; see [NOTICE](../NOTICE). The `ruslan` voice is trained on a CC
+BY-NC-SA 4.0 corpus and is for non-commercial use only.
+
+## License
+Distributed under the GNU GPL v3.0 or later: see [LICENSE](../LICENSE),
+[COPYRIGHT](../COPYRIGHT) and [NOTICE](../NOTICE).

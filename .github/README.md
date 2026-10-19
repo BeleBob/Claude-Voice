@@ -8,6 +8,7 @@
     <img src="https://img.shields.io/badge/Piper-TTS-455a64?style=flat-square" alt="Синтез речи Piper">
     <img src="https://img.shields.io/badge/Python-3-3776AB?style=flat-square&amp;logo=python&amp;logoColor=white" alt="Python 3">
     <img src="https://img.shields.io/badge/root-not_required-2E7D32?style=flat-square" alt="Root не нужен">
+    <a href="../LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0--or--later-blue?style=flat-square" alt="Лицензия GPL-3.0 или новее"></a>
   </p>
   <p><strong>Русский</strong> · <a href="README.en.md">English</a></p>
 </div>
@@ -38,6 +39,7 @@ Discord / Steam (вывод) ──► Voice Chat ──► твои наушн�
 - [Contributing](#contributing)
 - [To do](#to-do)
 - [Используемые компоненты](#используемые-компоненты)
+- [Лицензия](#лицензия)
 
 ## Возможности
 - **Виртуальные устройства.** Отдельный экземпляр PipeWire создаёт «Claude Mic»
@@ -166,4 +168,10 @@ pw-record --target claude_mic --rate 16000 --channels 1 --raw /tmp/mic.raw & cla
   large-v3-turbo — распознавание речи.
 - [PipeWire](https://pipewire.org) — виртуальные устройства.
 
-Компоненты скачиваются установщиком и распространяются по своим лицензиям.
+Компоненты скачиваются установщиком и распространяются по своим лицензиям,
+подробности — в [NOTICE](../NOTICE). Голос `ruslan` обучен на корпусе с
+лицензией CC BY-NC-SA 4.0 и годится только для некоммерческого использования.
+
+## Лицензия
+Распространяется по лицензии GNU GPL v3.0 или более поздней версии: см.
+[LICENSE](../LICENSE), [COPYRIGHT](../COPYRIGHT) и [NOTICE](../NOTICE).
