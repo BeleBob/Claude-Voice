@@ -23,7 +23,7 @@ context.modules = [
     { name = libpipewire-module-adapter }
 
     # "Claude Mic": a sink that mixes the real microphone and Claude's speech,
-    # exposed to apps as a microphone. Pick it as the input in Discord/Steam.
+    # exposed to apps as a microphone. Pick it as the input in the voice chat app.
     { name = libpipewire-module-loopback
         args = {
             node.description = "Claude Mic"
@@ -61,7 +61,7 @@ context.modules = [
         }
     }
 
-    # "Voice Chat": pick it as the output in Discord/Steam. Audio is forwarded
+    # "Voice Chat": pick it as the output in the voice chat app. Audio is forwarded
     # to the default output; claude-hear records its monitor.
     { name = libpipewire-module-loopback
         args = {

@@ -1,6 +1,6 @@
 <div align="center">
   <h1>Claude-Voice</h1>
-  <p>Голос для Claude Code: говорит и слушает в голосовых чатах Discord и Steam, весь звук обрабатывается локально.</p>
+  <p>Голос для Claude Code: говорит и слушает в любой программе для голосового общения, весь звук обрабатывается локально.</p>
   <p>
     <img src="https://img.shields.io/badge/Linux-PipeWire-455a64?style=flat-square&amp;logo=linux&amp;logoColor=white" alt="Linux и PipeWire">
     <img src="https://img.shields.io/badge/Claude_Code-voice-D97757?style=flat-square&amp;logo=claude&amp;logoColor=white" alt="Claude Code">
@@ -14,21 +14,23 @@
 </div>
 
 Claude-Voice позволяет [Claude Code](https://claude.com/claude-code) участвовать
-в голосовых чатах Discord и Steam на Linux с PipeWire. Claude говорит в
-виртуальный микрофон «Claude Mic» и слышит собеседников через устройство вывода
-«Voice Chat». Речь синтезирует [Piper](https://github.com/OHF-Voice/piper1-gpl),
+в голосовых чатах на Linux с PipeWire. Claude говорит в виртуальный микрофон
+«Claude Mic» и слышит собеседников через устройство вывода «Voice Chat». Это
+обычные системные устройства, поэтому подходит любая программа, где их можно
+выбрать: Discord, Steam, Telegram, TeamSpeak, Mumble, звонки в браузере, игры.
+Речь синтезирует [Piper](https://github.com/OHF-Voice/piper1-gpl),
 распознаёт [whisper.cpp](https://github.com/ggml-org/whisper.cpp) на Vulkan —
 оба работают на этой машине.
 
 ```text
 твой микрофон ─┐
-               ├─► Claude Mic ──► Discord / Steam (ввод)
+               ├─► Claude Mic ──► программа для звонков (ввод)
 claude-say ────┘        (слышно и в твоих наушниках)
 
-Discord / Steam (вывод) ──► Voice Chat ──► твои наушники
-                                 └──► claude-hear ──► whisper-server ──► transcript.jsonl
-                                                                              │
-                                                    Claude Code ◄── claude-listen
+программа для звонков (вывод) ──► Voice Chat ──► твои наушники
+                                       └──► claude-hear ──► whisper-server ──► transcript.jsonl
+                                                                                    │
+                                                          Claude Code ◄── claude-listen
 ```
 
 ## Содержание
@@ -80,8 +82,11 @@ claude-voice on
 `~/.config/systemd/user`. Повторный запуск пропускает готовые шаги. Все
 настройки описаны в [config.example](../config.example).
 
-В Discord и Steam выбери устройство ввода **Claude Mic** и устройство вывода
-**Voice Chat**. `claude-voice off` убирает виртуальные устройства; после этого
+В программе для звонков выбери устройство ввода **Claude Mic** и устройство
+вывода **Voice Chat**. Если в программе нет выбора устройств, назначь их ей в
+pavucontrol или в настройках звука KDE. Не делай Voice Chat выходом по умолчанию
+для всей системы: тогда Claude будет расшифровывать и музыку, и видео.
+`claude-voice off` убирает виртуальные устройства; после этого
 верни в программах свои настоящие устройства.
 
 ### Основные команды

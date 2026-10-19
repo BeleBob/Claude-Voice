@@ -1,6 +1,6 @@
 <div align="center">
   <h1>Claude-Voice</h1>
-  <p>A voice for Claude Code: it speaks and listens in Discord and Steam voice chats, with all audio processed locally.</p>
+  <p>A voice for Claude Code: it speaks and listens in any voice chat app, with all audio processed locally.</p>
   <p>
     <img src="https://img.shields.io/badge/Linux-PipeWire-455a64?style=flat-square&amp;logo=linux&amp;logoColor=white" alt="Linux and PipeWire">
     <img src="https://img.shields.io/badge/Claude_Code-voice-D97757?style=flat-square&amp;logo=claude&amp;logoColor=white" alt="Claude Code">
@@ -14,21 +14,22 @@
 </div>
 
 Claude-Voice lets [Claude Code](https://claude.com/claude-code) take part in
-Discord and Steam voice chats on Linux with PipeWire. Claude speaks into the
-"Claude Mic" virtual microphone and hears the others through the "Voice Chat"
-output device. Speech is synthesized by
+voice chats on Linux with PipeWire. Claude speaks into the "Claude Mic" virtual
+microphone and hears the others through the "Voice Chat" output device. These
+are ordinary system devices, so any app that lets you pick them works: Discord,
+Steam, Telegram, TeamSpeak, Mumble, browser calls, games. Speech is synthesized by
 [Piper](https://github.com/OHF-Voice/piper1-gpl) and recognized by
 [whisper.cpp](https://github.com/ggml-org/whisper.cpp) on Vulkan, both running
 on this machine.
 
 ```text
 your mic ───┐
-            ├─► Claude Mic ──► Discord / Steam (input)
+            ├─► Claude Mic ──► voice chat app (input)
 claude-say ─┘        (also played in your headphones)
 
-Discord / Steam (output) ──► Voice Chat ──► your headphones
-                                  └──► claude-hear ──► whisper-server ──► transcript.jsonl
-                                                                              │
+voice chat app (output) ──► Voice Chat ──► your headphones
+                                 └──► claude-hear ──► whisper-server ──► transcript.jsonl
+                                                                             │
                                                      Claude Code ◄── claude-listen
 ```
 
@@ -81,8 +82,11 @@ downloads the model and voices, and links the commands into `~/.local/bin` and
 the units into `~/.config/systemd/user`. Running it again skips finished steps.
 All settings are described in [config.example](../config.example).
 
-In Discord and Steam set the input device to **Claude Mic** and the output
-device to **Voice Chat**. `claude-voice off` removes the virtual devices; switch
+In your voice chat app set the input device to **Claude Mic** and the output
+device to **Voice Chat**. If the app has no device choice, assign the devices to
+it in pavucontrol or the KDE sound settings. Don't make Voice Chat the system
+default output: Claude would then transcribe music and videos too.
+`claude-voice off` removes the virtual devices; switch
 the apps back to your real devices afterwards.
 
 ### Main commands

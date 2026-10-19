@@ -182,7 +182,7 @@ def main():
     threshold = float(conf.get("VAD_THRESHOLD", "500"))
     silence_ms = int(conf.get("VAD_SILENCE_MS", "800"))
     sources = [
-        # Other people: everything Discord/Steam play into Voice Chat.
+        # Other people: everything the voice chat app plays into Voice Chat.
         ("chat", "voice_chat", "{ stream.capture.sink=true node.name=claude_hear }"),
     ]
     if conf.get("MIC_SOURCE"):

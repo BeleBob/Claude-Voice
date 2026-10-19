@@ -1,6 +1,6 @@
 # Claude-Voice
 
-Lets Claude Code talk in Discord/Steam voice chats: `claude-say` speaks into the
+Lets Claude Code talk in voice chats (Discord, Steam or any other app): `claude-say` speaks into the
 "Claude Mic" virtual microphone, `claude-hear` transcribes the "Voice Chat"
 output into `~/.local/state/claude-voice/transcript.jsonl`, `claude-listen`
 waits for new phrases.
