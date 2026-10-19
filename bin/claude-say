@@ -13,7 +13,7 @@ text=${*:-$(cat)}
 [[ -n ${text// } ]] || { echo "claude-say: empty text" >&2; exit 1; }
 
 wav=$(mktemp --suffix=.wav)
-trap 'rm -f "$wav"' EXIT
+trap 'rm -f "$wav" "$state/speaking"' EXIT
 
 printf '%s\n' "$text" | "$data/venv/bin/piper" \
     -m "$data/voices/${VOICE:-ru_RU-denis-medium}.onnx" \
@@ -27,6 +27,7 @@ with open(sys.argv[1], "a", encoding="utf-8") as f:
                        ensure_ascii=False) + "\n")
 EOF
 
+echo $$ >"$state/speaking"  # claude-voice-tray shows a dot while this exists
 pw-play --target claude_mic_mix "$wav" &
 if [[ ${MONITOR:-1} == 1 ]]; then
     pw-play "$wav" &

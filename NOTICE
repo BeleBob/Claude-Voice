@@ -1,8 +1,15 @@
 Third-Party Licenses
 ====================
 
-This repository contains no third-party code. install.sh downloads and
-builds the following software and models; each comes under its own license.
+This repository contains no third-party code apart from icons/claude.svg
+(below). install.sh downloads and builds the following software and models;
+each comes under its own license.
+
+------------------------------------------------------------------------------
+icons/claude.svg
+https://simpleicons.org (simple-icons 16.35.0)
+The SVG file is released under CC0 1.0. The Claude logo is a trademark of
+Anthropic PBC; it is used here only to identify Claude Code.
 
 ------------------------------------------------------------------------------
 Piper (piper-tts)

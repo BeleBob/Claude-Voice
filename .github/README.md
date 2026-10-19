@@ -63,6 +63,9 @@ claude-say ────┘        (слышно и в твоих наушник�
   («Клод, …») и выводит её вместе с контекстом последней минуты.
 - **Запуск одной командой.** `claude-chat` включает устройства и сразу
   открывает Claude Code в режиме голосового чата.
+- **Значок в трее.** Логотип Claude показывает состояние: выключено, включено,
+  Claude слушает, Claude говорит. Клик заводит Claude в голосовой чат или
+  выключает всё.
 - **Без root.** Всё ставится в домашний каталог и запускается user-юнитами
   systemd.
 
@@ -73,6 +76,7 @@ claude-say ────┘        (слышно и в твоих наушник�
 - `uv`, `git`, `cmake`, `ninja`, `glslc`, `curl`, `python3`.
 - Видеокарта с драйвером Vulkan.
 - [Claude Code](https://claude.com/claude-code).
+- Для значка в трее — PyQt6 (необязательно).
 
 ### Установка
 ```sh
@@ -103,6 +107,23 @@ pavucontrol или в настройках звука KDE. Не делай Voice
 | `claude-listen` | ждать фразу с обращением и вывести её с контекстом |
 | `claude-listen --all` | ждать любую фразу |
 | `claude-listen --recent --context 300` | показать последние пять минут |
+| `claude-voice-tray` | значок в трее (запускается сам при входе в систему) |
+
+### Значок в трее
+`install.sh` включает `claude-voice-tray.service`: значок появляется при входе
+в систему, сам Claude-Voice при этом остаётся выключенным.
+
+| Значок | Состояние |
+|---|---|
+| серый | выключено |
+| приглушённый оранжевый | устройства включены, Claude не в чате |
+| оранжевый | Claude слушает (`claude-listen`) |
+| оранжевый с зелёной точкой | Claude говорит (`claude-say`) |
+
+Клик по выключенному значку запускает `claude-chat` в терминале, по
+включённому — `claude-voice off`. Команду запуска Claude Code и терминал
+задают `CLAUDE_CMD` и `TERMINAL` в `~/.config/claude-voice/config`;
+`CLAUDE_CMD` может быть и алиасом из твоей оболочки.
 
 ### Голосовой чат из Claude Code
 Открой Claude Code в каталоге проекта (или запусти `claude-chat`) и попроси
@@ -141,6 +162,7 @@ Claude, правила поведения в канале описаны в [CLA
 Claude-Voice/
   bin/            # claude-voice, claude-chat, claude-say, claude-hear, claude-listen
   lib/            # фильтр оскорблений для claude-hear
+  icons/          # логотип Claude для значка в трее
   pipewire/       # шаблон конфига виртуальных устройств
   systemd/        # user-юниты и claude-voice.target
   config.example  # настройки, копируются в ~/.config/claude-voice/config
@@ -154,6 +176,9 @@ Claude-Voice/
 - `claude-whisper` — whisper-server на `127.0.0.1:8178`;
 - `claude-hear` — запись монитора Voice Chat и распознавание.
 
+Отдельно от них `claude-voice-tray.service` запускает значок в трее вместе с
+графическим сеансом.
+
 Данные лежат в `~/.local/share/claude-voice`, настройки — в
 `~/.config/claude-voice`, расшифровка — в `~/.local/state/claude-voice`.
 
@@ -162,7 +187,7 @@ Claude-Voice/
 
 ```sh
 bash -n install.sh bin/claude-voice bin/claude-chat bin/claude-say
-python3 -m py_compile bin/claude-hear bin/claude-listen lib/speech_filter.py
+python3 -m py_compile bin/claude-hear bin/claude-listen bin/claude-voice-tray lib/speech_filter.py
 ./install.sh
 systemctl --user restart claude-voice.target
 ```
@@ -189,6 +214,7 @@ pw-record --target claude_mic --rate 16000 --channels 1 --raw /tmp/mic.raw & cla
 - [x] Свой микрофон подмешивается в Claude Mic и тоже распознаётся
 - [x] Запуск одной командой — `claude-chat`
 - [x] Фильтр мата и оскорблений на устройстве
+- [x] Значок в трее
 - [ ] Имена говорящих в расшифровке
 - [ ] Другие языки: голоса Piper и язык whisper-server сейчас русские
 
@@ -201,6 +227,8 @@ pw-record --target claude_mic --rate 16000 --channels 1 --raw /tmp/mic.raw & cla
   ([ONNX](https://huggingface.co/onnx-community/rubert-tiny-toxicity-ONNX)) —
   фильтр оскорблений.
 - [PipeWire](https://pipewire.org) — виртуальные устройства.
+- Логотип Claude из [Simple Icons](https://simpleicons.org) (CC0) — значок в
+  трее. Логотип — товарный знак Anthropic.
 
 Компоненты скачиваются установщиком и распространяются по своим лицензиям,
 подробности — в [NOTICE](../NOTICE). Голос `ruslan` обучен на корпусе с

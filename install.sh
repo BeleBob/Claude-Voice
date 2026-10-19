@@ -98,6 +98,12 @@ for f in "$repo"/systemd/*; do
     ln -sf "$f" "$units/$(basename "$f")"
 done
 systemctl --user daemon-reload
+if python3 -c "import PyQt6.QtSvg" 2>/dev/null; then
+    # Starts with the desktop session; Claude-Voice itself stays off.
+    systemctl --user enable -q claude-voice-tray.service
+else
+    echo "warning: PyQt6 not found, skipping the tray icon (claude-voice-tray)"
+fi
 
 step "done"
 echo "Turn on:  claude-voice on      Turn off: claude-voice off"

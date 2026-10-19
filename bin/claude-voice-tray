@@ -1,0 +1,189 @@
+#!/usr/bin/env python3
+"""Tray icon for Claude-Voice: shows its state and turns it on and off.
+
+Grey: off. Dim orange: devices on, Claude not in the chat. Orange: Claude is
+listening (claude-listen runs). A dot: Claude is speaking (claude-say runs).
+Click to bring Claude into the voice chat (claude-chat in a terminal) or to
+turn everything off. Starts with Claude-Voice off; it never turns it on by itself.
+"""
+
+import os
+import shlex
+import subprocess
+import sys
+
+from PyQt6.QtCore import QByteArray, QRectF, Qt, QTimer
+from PyQt6.QtGui import QAction, QColor, QIcon, QPainter, QPixmap
+from PyQt6.QtSvg import QSvgRenderer
+from PyQt6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
+
+REPO = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+BIN = os.path.join(REPO, "bin")
+STATE_DIR = os.path.join(
+    os.environ.get("XDG_STATE_HOME", os.path.expanduser("~/.local/state")), "claude-voice"
+)
+SPEAKING = os.path.join(STATE_DIR, "speaking")
+UNITS = ("claude-voice-devices", "claude-whisper", "claude-hear")
+
+ORANGE = "#D97757"
+STATES = {
+    # state: (icon color, icon opacity, tooltip)
+    "off": ("#8a8a8a", 1.0, "Claude-Voice выключен"),
+    "on": (ORANGE, 0.55, "Claude-Voice включён, Claude не в чате"),
+    "listening": (ORANGE, 1.0, "Claude слушает голосовой чат"),
+    "speaking": (ORANGE, 1.0, "Claude говорит"),
+}
+
+
+def load_config():
+    path = os.path.join(
+        os.environ.get("XDG_CONFIG_HOME", os.path.expanduser("~/.config")), "claude-voice", "config"
+    )
+    conf = {}
+    try:
+        with open(path, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    key, value = line.split("=", 1)
+                    conf[key.strip()] = value.strip().strip("\"'")
+    except FileNotFoundError:
+        pass
+    return conf
+
+
+def pid_alive(pid):
+    try:
+        os.kill(pid, 0)
+        return True
+    except (ProcessLookupError, ValueError):
+        return False
+    except PermissionError:
+        return True
+
+
+def listening():
+    uid = os.getuid()
+    for pid in os.listdir("/proc"):
+        if not pid.isdigit():
+            continue
+        try:
+            if os.stat(f"/proc/{pid}").st_uid != uid:
+                continue
+            with open(f"/proc/{pid}/cmdline", "rb") as f:
+                args = f.read().split(b"\0")
+        except OSError:
+            continue
+        if any(os.path.basename(a) == b"claude-listen" for a in args[:2]):
+            return True
+    return False
+
+
+def speaking():
+    try:
+        with open(SPEAKING) as f:
+            return pid_alive(int(f.read().strip()))
+    except (OSError, ValueError):
+        return False
+
+
+def voice_on():
+    res = subprocess.run(
+        ["systemctl", "--user", "is-active", *UNITS], capture_output=True, text=True
+    )
+    return res.stdout.split() == ["active"] * len(UNITS)
+
+
+def current_state():
+    if not voice_on():
+        return "off"
+    if speaking():
+        return "speaking"
+    return "listening" if listening() else "on"
+
+
+class Tray:
+    def __init__(self, app):
+        with open(os.path.join(REPO, "icons", "claude.svg"), encoding="utf-8") as f:
+            self.svg = f.read()
+        self.icons = {state: self.render(state) for state in STATES}
+        self.state = None
+
+        self.tray = QSystemTrayIcon()
+        self.tray.activated.connect(self.on_activated)
+        menu = QMenu()
+        self.title = QAction(menu)
+        self.title.setEnabled(False)
+        menu.addAction(self.title)
+        menu.addSeparator()
+        self.join = menu.addAction("Зайти в голосовой чат", self.join_chat)
+        self.off = menu.addAction("Выключить", self.turn_off)
+        menu.addSeparator()
+        menu.addAction("Закрыть значок", app.quit)
+        self.menu = menu
+        self.tray.setContextMenu(menu)
+
+        self.update()
+        self.tray.show()
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.update)
+        self.timer.start(1000)
+
+    def render(self, state):
+        color, opacity, _ = STATES[state]
+        svg = self.svg.replace("<path ", f'<path fill="{color}" ', 1)
+        renderer = QSvgRenderer(QByteArray(svg.encode()))
+        pixmap = QPixmap(64, 64)
+        pixmap.fill(Qt.GlobalColor.transparent)
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setOpacity(opacity)
+        renderer.render(painter, QRectF(2, 2, 60, 60))
+        if state == "speaking":
+            painter.setOpacity(1.0)
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(QColor("#4CAF50"))
+            painter.drawEllipse(QRectF(40, 40, 22, 22))
+        painter.end()
+        return QIcon(pixmap)
+
+    def update(self):
+        state = current_state()
+        if state == self.state:
+            return
+        self.state = state
+        tooltip = STATES[state][2]
+        self.tray.setIcon(self.icons[state])
+        self.tray.setToolTip(tooltip)
+        self.title.setText(tooltip)
+        self.off.setEnabled(state != "off")
+        self.join.setEnabled(state in ("off", "on"))
+
+    def on_activated(self, reason):
+        if reason != QSystemTrayIcon.ActivationReason.Trigger:
+            return
+        if self.state == "off":
+            self.join_chat()
+        else:
+            self.turn_off()
+
+    def join_chat(self):
+        terminal = shlex.split(load_config().get("TERMINAL", "konsole -e"))
+        subprocess.Popen([*terminal, os.path.join(BIN, "claude-chat")], start_new_session=True)
+
+    def turn_off(self):
+        subprocess.Popen([os.path.join(BIN, "claude-voice"), "off"], start_new_session=True)
+
+
+def main():
+    app = QApplication(sys.argv)
+    app.setApplicationName("claude-voice-tray")
+    app.setQuitOnLastWindowClosed(False)
+    if not QSystemTrayIcon.isSystemTrayAvailable():
+        sys.exit("claude-voice-tray: no system tray available")
+    tray = Tray(app)  # noqa: F841 - keeps the icon alive
+    sys.exit(app.exec())
+
+
+if __name__ == "__main__":
+    main()

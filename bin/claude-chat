@@ -3,6 +3,19 @@
 # services, then open Claude Code in this repo already listening.
 set -euo pipefail
 repo=$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)
-claude-voice on
+conf=${XDG_CONFIG_HOME:-$HOME/.config}/claude-voice/config
+# shellcheck source=/dev/null
+[[ -f $conf ]] && . "$conf"
+
+"$repo/bin/claude-voice" on
 cd "$repo"
-exec claude "Зайди в голосовой чат"
+prompt="Зайди в голосовой чат"
+cmd=${CLAUDE_CMD:-claude}
+if type -P "$cmd" >/dev/null; then
+    exec "$cmd" "$prompt"
+fi
+# CLAUDE_CMD is an alias, a function or has arguments: those only work in the
+# user's interactive shell (and PATH may lack ~/.local/bin when started from
+# the tray).
+shell=${SHELL:-$(getent passwd "$(id -un)" | cut -d: -f7)}
+exec "${shell:-/bin/bash}" -ic "$cmd \"\$0\"" "$prompt"

@@ -29,6 +29,13 @@ WAKE_WORDS=клод,клот,клоуд,клауд,claude,clot,cloud,clod
 VAD_THRESHOLD=500
 VAD_SILENCE_MS=800
 
+# Command that starts Claude Code for claude-chat and the tray. Aliases from
+# your interactive shell work too.
+CLAUDE_CMD=claude
+
+# Terminal the tray opens claude-chat in; the command is appended.
+TERMINAL="konsole -e"
+
 # Local speech filter, applied before anything is written to the transcript, so
 # filtered speech never reaches Claude. Swear words are replaced with ***;
 # phrases the model scores at or above FILTER_THRESHOLD for one of

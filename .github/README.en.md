@@ -63,6 +63,9 @@ voice chat app (output) ──► Voice Chat ──► your headphones
   ("Claude, …") and prints it with the last minute of context.
 - **One command to start.** `claude-chat` turns the devices on and opens Claude
   Code already in voice chat mode.
+- **Tray icon.** The Claude logo shows the state: off, on, Claude listening,
+  Claude speaking. A click brings Claude into the voice chat or turns
+  everything off.
 - **No root.** Everything is installed into your home directory and runs as
   systemd user units.
 
@@ -73,6 +76,7 @@ voice chat app (output) ──► Voice Chat ──► your headphones
 - `uv`, `git`, `cmake`, `ninja`, `glslc`, `curl`, `python3`.
 - A GPU with a Vulkan driver.
 - [Claude Code](https://claude.com/claude-code).
+- PyQt6 for the tray icon (optional).
 
 ### Install
 ```sh
@@ -103,6 +107,23 @@ the apps back to your real devices afterwards.
 | `claude-listen` | wait for a phrase with a wake word, print it with recent context |
 | `claude-listen --all` | return on any phrase |
 | `claude-listen --recent --context 300` | print the last five minutes |
+| `claude-voice-tray` | tray icon (starts by itself when you log in) |
+
+### Tray icon
+`install.sh` enables `claude-voice-tray.service`: the icon appears when you log
+in, while Claude-Voice itself stays off.
+
+| Icon | State |
+|---|---|
+| grey | off |
+| dim orange | devices on, Claude not in the chat |
+| orange | Claude is listening (`claude-listen`) |
+| orange with a green dot | Claude is speaking (`claude-say`) |
+
+Clicking the icon when off runs `claude-chat` in a terminal; when on, it runs
+`claude-voice off`. `CLAUDE_CMD` and `TERMINAL` in
+`~/.config/claude-voice/config` set the command that starts Claude Code and
+the terminal; `CLAUDE_CMD` can be an alias from your shell.
 
 ### Voice chat from Claude Code
 Open Claude Code in the project directory (or run `claude-chat`) and ask it to
@@ -141,6 +162,7 @@ refuses those itself, and the conduct rules for the channel are in
 Claude-Voice/
   bin/            # claude-voice, claude-chat, claude-say, claude-hear, claude-listen
   lib/            # insult filter for claude-hear
+  icons/          # Claude logo for the tray icon
   pipewire/       # virtual devices config template
   systemd/        # user units and claude-voice.target
   config.example  # settings, copied to ~/.config/claude-voice/config
@@ -154,6 +176,9 @@ Claude-Voice/
 - `claude-whisper` — whisper-server on `127.0.0.1:8178`;
 - `claude-hear` — records the Voice Chat monitor and transcribes it.
 
+Separately, `claude-voice-tray.service` runs the tray icon with the graphical
+session.
+
 Data lives in `~/.local/share/claude-voice`, settings in
 `~/.config/claude-voice`, the transcript in `~/.local/state/claude-voice`.
 
@@ -162,7 +187,7 @@ After changes, check the syntax, reinstall and restart the services:
 
 ```sh
 bash -n install.sh bin/claude-voice bin/claude-chat bin/claude-say
-python3 -m py_compile bin/claude-hear bin/claude-listen lib/speech_filter.py
+python3 -m py_compile bin/claude-hear bin/claude-listen bin/claude-voice-tray lib/speech_filter.py
 ./install.sh
 systemctl --user restart claude-voice.target
 ```
@@ -189,6 +214,7 @@ one.
 - [x] Your own mic is mixed into Claude Mic and transcribed too
 - [x] One command to start — `claude-chat`
 - [x] On-device swearing and insult filter
+- [x] Tray icon
 - [ ] Speaker names in the transcript
 - [ ] Other languages: Piper voices and the whisper-server language are Russian for now
 
@@ -201,6 +227,8 @@ one.
   ([ONNX](https://huggingface.co/onnx-community/rubert-tiny-toxicity-ONNX)) —
   insult filter.
 - [PipeWire](https://pipewire.org) — virtual devices.
+- The Claude logo from [Simple Icons](https://simpleicons.org) (CC0) — tray
+  icon. The logo is a trademark of Anthropic.
 
 The components are downloaded by the installer and come under their own
 licenses; see [NOTICE](../NOTICE). The `ruslan` voice is trained on a CC
