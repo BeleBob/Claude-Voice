@@ -28,3 +28,13 @@ WAKE_WORDS=клод,клот,клоуд,клауд,claude,clot,cloud,clod
 # long a pause (ms) ends a phrase.
 VAD_THRESHOLD=500
 VAD_SILENCE_MS=800
+
+# Local speech filter, applied before anything is written to the transcript, so
+# filtered speech never reaches Claude. Swear words are replaced with ***;
+# phrases the model scores at or above FILTER_THRESHOLD for one of
+# FILTER_LABELS are dropped. Labels: insult, threat, dangerous. "threat" also
+# hides game talk like "убей его, он слева"; "dangerous" is noisy.
+# FILTER=0 turns it off.
+FILTER=1
+FILTER_LABELS=insult
+FILTER_THRESHOLD=0.5

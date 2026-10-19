@@ -31,6 +31,17 @@ Copyright (c) 2022 OpenAI.
 Licensed under the MIT License.
 
 ------------------------------------------------------------------------------
+rubert-tiny-toxicity (ONNX conversion by onnx-community)
+https://huggingface.co/cointegrated/rubert-tiny-toxicity
+https://huggingface.co/onnx-community/rubert-tiny-toxicity-ONNX
+Licensed under the MIT License.
+
+------------------------------------------------------------------------------
+tokenizers
+https://github.com/huggingface/tokenizers
+Licensed under the Apache License, Version 2.0.
+
+------------------------------------------------------------------------------
 SPIRV-Headers
 https://github.com/KhronosGroup/SPIRV-Headers
 Copyright (c) 2015-2024 The Khronos Group Inc.

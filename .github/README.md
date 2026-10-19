@@ -50,8 +50,13 @@ claude-say ────┘        (слышно и в твоих наушник�
   собеседники слышат и тебя, и Claude.
 - **Локальное распознавание.** `claude-hear` слушает Voice Chat и твой
   микрофон, делит звук на фразы простым VAD и отправляет их в whisper-server
-  (модель large-v3-turbo, Vulkan). Текст
-  дописывается в `~/.local/state/claude-voice/transcript.jsonl`.
+  (модель large-v3-turbo, Vulkan). Текст дописывается в
+  `~/.local/state/claude-voice/transcript.jsonl`.
+- **Фильтр оскорблений на устройстве.** До записи в расшифровку мат заменяется
+  на `***`, а фразы, которые модель
+  [rubert-tiny-toxicity](https://huggingface.co/cointegrated/rubert-tiny-toxicity)
+  считает оскорблением, выбрасываются. Такие фразы не уходят Claude, и он на
+  них не отвечает.
 - **Локальный синтез.** `claude-say` озвучивает текст голосом Piper; в комплекте
   четыре русских голоса.
 - **Обращение по имени.** `claude-listen` ждёт фразу со словом-обращением
@@ -110,12 +115,32 @@ Claude ждёт обращения через `claude-listen`, отвечает 
 Распознавание локальное, но текст речи всех в канале уходит Claude как часть
 диалога. Предупреди собеседников.
 
+### Фильтр оскорблений
+Фильтр работает в `claude-hear` до записи в расшифровку, поэтому
+отфильтрованное не попадает ни в файл, ни к Claude, ни на серверы Anthropic.
+В журнале сервиса остаётся только отметка без текста:
+`chat: phrase hidden (insult 1.00)`.
+
+- Мат заменяется на `***` по списку слов, обычная фраза при этом доходит:
+  «Клод, ***, сколько времени?».
+- Оскорбления (`insult`) выбрасываются целиком. Угрозы (`threat`) по умолчанию
+  не скрываются: модель путает с ними игровые фразы вроде «убей его, он слева».
+- Настройки: `FILTER`, `FILTER_LABELS`, `FILTER_THRESHOLD` в
+  `~/.config/claude-voice/config`.
+- Если модель не загрузилась, `claude-hear` не запускается, а не пишет текст
+  без фильтра.
+
+Фильтр не идеален: модель иногда пропускает оскорбление или скрывает обычную
+фразу. Просьбы о противозаконном она не распознаёт; на них отказывает сам
+Claude, правила поведения в канале описаны в [CLAUDE.md](../CLAUDE.md).
+
 ## Разработка
 
 ### Структура
 ```
 Claude-Voice/
   bin/            # claude-voice, claude-chat, claude-say, claude-hear, claude-listen
+  lib/            # фильтр оскорблений для claude-hear
   pipewire/       # шаблон конфига виртуальных устройств
   systemd/        # user-юниты и claude-voice.target
   config.example  # настройки, копируются в ~/.config/claude-voice/config
@@ -137,7 +162,7 @@ Claude-Voice/
 
 ```sh
 bash -n install.sh bin/claude-voice bin/claude-chat bin/claude-say
-python3 -m py_compile bin/claude-hear bin/claude-listen
+python3 -m py_compile bin/claude-hear bin/claude-listen lib/speech_filter.py
 ./install.sh
 systemctl --user restart claude-voice.target
 ```
@@ -163,6 +188,7 @@ pw-record --target claude_mic --rate 16000 --channels 1 --raw /tmp/mic.raw & cla
 - [x] Обращение по имени и контекст последней минуты
 - [x] Свой микрофон подмешивается в Claude Mic и тоже распознаётся
 - [x] Запуск одной командой — `claude-chat`
+- [x] Фильтр мата и оскорблений на устройстве
 - [ ] Имена говорящих в расшифровке
 - [ ] Другие языки: голоса Piper и язык whisper-server сейчас русские
 
@@ -171,6 +197,9 @@ pw-record --target claude_mic --rate 16000 --channels 1 --raw /tmp/mic.raw & cla
   [голоса Piper](https://huggingface.co/rhasspy/piper-voices) — синтез речи.
 - [whisper.cpp](https://github.com/ggml-org/whisper.cpp) и модель Whisper
   large-v3-turbo — распознавание речи.
+- [rubert-tiny-toxicity](https://huggingface.co/cointegrated/rubert-tiny-toxicity)
+  ([ONNX](https://huggingface.co/onnx-community/rubert-tiny-toxicity-ONNX)) —
+  фильтр оскорблений.
 - [PipeWire](https://pipewire.org) — виртуальные устройства.
 
 Компоненты скачиваются установщиком и распространяются по своим лицензиям,

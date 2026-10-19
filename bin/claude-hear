@@ -3,7 +3,9 @@
 
 Records the sink monitor with pw-record, splits speech into phrases with a
 simple energy-based VAD, sends each phrase to whisper-server and appends the
-text to ~/.local/state/claude-voice/transcript.jsonl.
+text to ~/.local/state/claude-voice/transcript.jsonl. With FILTER=1 swearing is
+masked and insults are dropped before they are written (lib/speech_filter.py),
+so they never reach Claude.
 """
 
 import array
@@ -42,6 +44,11 @@ STATE_DIR = os.path.join(
     os.environ.get("XDG_STATE_HOME", os.path.expanduser("~/.local/state")), "claude-voice"
 )
 TRANSCRIPT = os.path.join(STATE_DIR, "transcript.jsonl")
+DATA_DIR = os.path.join(
+    os.environ.get("XDG_DATA_HOME", os.path.expanduser("~/.local/share")), "claude-voice"
+)
+FILTER_MODEL = os.path.join(DATA_DIR, "models", "toxicity")
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "lib"))
 
 
 def load_config():
@@ -110,7 +117,16 @@ def is_noise(text):
     return letters < 2 or any(h in lowered for h in HALLUCINATIONS)
 
 
-def transcriber(phrases, url, language):
+def load_filter(conf):
+    if conf.get("FILTER", "1") == "0":
+        return None
+    from speech_filter import SpeechFilter
+
+    labels = [label.strip() for label in conf.get("FILTER_LABELS", "insult").split(",") if label.strip()]
+    return SpeechFilter(FILTER_MODEL, labels, float(conf.get("FILTER_THRESHOLD", "0.5")))
+
+
+def transcriber(phrases, url, language, speech_filter):
     os.makedirs(STATE_DIR, exist_ok=True)
     while True:
         who, started, pcm = phrases.get()
@@ -121,6 +137,11 @@ def transcriber(phrases, url, language):
             continue
         if is_noise(text):
             continue
+        if speech_filter:
+            text, dropped = speech_filter.check(text)
+            if dropped:
+                print(f"{who}: phrase hidden ({dropped[0]} {dropped[1]:.2f})", flush=True)
+                continue
         with open(TRANSCRIPT, "a", encoding="utf-8") as f:
             f.write(json.dumps({"ts": started, "who": who, "text": text}, ensure_ascii=False) + "\n")
         print(f"{who}: {text}", flush=True)
@@ -173,10 +194,19 @@ def capture(phrases, who, target, props, threshold, silence_ms):
 
 def main():
     conf = load_config()
+    try:
+        speech_filter = load_filter(conf)
+    except Exception as e:  # fail closed: without the filter nothing is transcribed
+        sys.exit(f"claude-hear: speech filter unavailable ({e}); run install.sh or set FILTER=0")
     phrases = queue.Queue()
     threading.Thread(
         target=transcriber,
-        args=(phrases, conf.get("WHISPER_URL", "http://127.0.0.1:8178/inference"), conf.get("LANGUAGE", "ru")),
+        args=(
+            phrases,
+            conf.get("WHISPER_URL", "http://127.0.0.1:8178/inference"),
+            conf.get("LANGUAGE", "ru"),
+            speech_filter,
+        ),
         daemon=True,
     ).start()
     threshold = float(conf.get("VAD_THRESHOLD", "500"))

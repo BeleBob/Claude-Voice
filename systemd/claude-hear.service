@@ -4,6 +4,7 @@ After=claude-voice-devices.service claude-whisper.service
 PartOf=claude-voice.target
 
 [Service]
-ExecStart=%h/.local/bin/claude-hear
+# The Piper venv provides onnxruntime and tokenizers for the speech filter.
+ExecStart=%h/.local/share/claude-voice/venv/bin/python %h/.local/bin/claude-hear
 Restart=on-failure
 RestartSec=2

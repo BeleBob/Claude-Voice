@@ -50,8 +50,13 @@ voice chat app (output) ──► Voice Chat ──► your headphones
   both you and Claude.
 - **Local recognition.** `claude-hear` listens to Voice Chat and your mic,
   splits audio into phrases with a simple VAD and sends them to whisper-server
-  (large-v3-turbo model, Vulkan). The text
-  is appended to `~/.local/state/claude-voice/transcript.jsonl`.
+  (large-v3-turbo model, Vulkan). The text is appended to
+  `~/.local/state/claude-voice/transcript.jsonl`.
+- **On-device insult filter.** Before anything is written to the transcript,
+  swear words are replaced with `***` and phrases that
+  [rubert-tiny-toxicity](https://huggingface.co/cointegrated/rubert-tiny-toxicity)
+  scores as insults are dropped. They never reach Claude, and it doesn't answer
+  them.
 - **Local synthesis.** `claude-say` speaks text with a Piper voice; four Russian
   voices are installed.
 - **Wake word.** `claude-listen` waits for a phrase with a wake word
@@ -110,12 +115,32 @@ and speech synthesis add up.
 Recognition is local, but the transcribed speech of everyone in the channel is
 sent to Claude as part of the conversation. Tell the people in the channel.
 
+### Insult filter
+The filter runs in `claude-hear` before the transcript is written, so filtered
+speech never reaches the file, Claude or Anthropic's servers. The service
+journal keeps only a note without the text: `chat: phrase hidden (insult 1.00)`.
+
+- Swear words are replaced with `***` from a word list; the rest of the phrase
+  still gets through: "Клод, ***, сколько времени?".
+- Insults (`insult`) are dropped whole. Threats (`threat`) are not hidden by
+  default: the model mistakes game talk like "убей его, он слева" for them.
+- Settings: `FILTER`, `FILTER_LABELS`, `FILTER_THRESHOLD` in
+  `~/.config/claude-voice/config`.
+- If the model fails to load, `claude-hear` refuses to start instead of writing
+  unfiltered text.
+
+The filter isn't perfect: the model sometimes misses an insult or hides a
+harmless phrase. It doesn't detect requests for something illegal; Claude
+refuses those itself, and the conduct rules for the channel are in
+[CLAUDE.md](../CLAUDE.md).
+
 ## Development
 
 ### Layout
 ```
 Claude-Voice/
   bin/            # claude-voice, claude-chat, claude-say, claude-hear, claude-listen
+  lib/            # insult filter for claude-hear
   pipewire/       # virtual devices config template
   systemd/        # user units and claude-voice.target
   config.example  # settings, copied to ~/.config/claude-voice/config
@@ -137,7 +162,7 @@ After changes, check the syntax, reinstall and restart the services:
 
 ```sh
 bash -n install.sh bin/claude-voice bin/claude-chat bin/claude-say
-python3 -m py_compile bin/claude-hear bin/claude-listen
+python3 -m py_compile bin/claude-hear bin/claude-listen lib/speech_filter.py
 ./install.sh
 systemctl --user restart claude-voice.target
 ```
@@ -163,6 +188,7 @@ one.
 - [x] Wake word and the last minute of context
 - [x] Your own mic is mixed into Claude Mic and transcribed too
 - [x] One command to start — `claude-chat`
+- [x] On-device swearing and insult filter
 - [ ] Speaker names in the transcript
 - [ ] Other languages: Piper voices and the whisper-server language are Russian for now
 
@@ -171,6 +197,9 @@ one.
   [Piper voices](https://huggingface.co/rhasspy/piper-voices) — speech synthesis.
 - [whisper.cpp](https://github.com/ggml-org/whisper.cpp) and the Whisper
   large-v3-turbo model — speech recognition.
+- [rubert-tiny-toxicity](https://huggingface.co/cointegrated/rubert-tiny-toxicity)
+  ([ONNX](https://huggingface.co/onnx-community/rubert-tiny-toxicity-ONNX)) —
+  insult filter.
 - [PipeWire](https://pipewire.org) — virtual devices.
 
 The components are downloaded by the installer and come under their own

@@ -5,6 +5,8 @@ set -euo pipefail
 
 WHISPER_TAG=v1.9.5
 WHISPER_MODEL=ggml-large-v3-turbo.bin
+FILTER_REPO=onnx-community/rubert-tiny-toxicity-ONNX
+FILTER_REV=3c117322c91030ff04846b72e15509ae7f5232f1
 
 repo=$(cd "$(dirname "$0")" && pwd)
 data=${XDG_DATA_HOME:-$HOME/.local/share}/claude-voice
@@ -46,6 +48,22 @@ for v in denis dmitri irina ruslan; do
         fi
     done
 done
+
+step "speech filter (rubert-tiny-toxicity)"
+"$data/venv/bin/python" -c "import tokenizers" 2>/dev/null ||
+    uv pip install -q --python "$data/venv/bin/python" tokenizers
+mkdir -p "$data/models/toxicity"
+while read -r sum src dst; do
+    f=$data/models/toxicity/$dst
+    if [[ ! -f $f ]] || ! echo "$sum  $f" | sha256sum -c --status; then
+        curl -fsSL -o "$f.part" "https://huggingface.co/$FILTER_REPO/resolve/$FILTER_REV/$src"
+        echo "$sum  $f.part" | sha256sum -c --status || { echo "checksum mismatch: $src" >&2; exit 1; }
+        mv "$f.part" "$f"
+    fi
+done <<'EOF'
+d39a12d945b616bc3c09c5b3cbe7ad5266672a3b6f4a6d346bffaed17c4562e9 onnx/model.onnx model.onnx
+064a132db204e46351abb4c3acb9da22fc4a837390be3b87877e79212e10dffa tokenizer.json tokenizer.json
+EOF
 
 step "whisper.cpp $WHISPER_TAG with Vulkan (speech to text)"
 if [[ ! -x $data/whisper/bin/whisper-server ]]; then
