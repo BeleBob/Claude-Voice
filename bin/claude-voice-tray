@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Tray icon for Claude-Voice: shows its state and turns it on and off.
 
-Grey: off. Dim orange: devices on, Claude not in the chat. Orange: Claude is
+Grey: off. Dim orange: devices on, Claude not listening. Orange: Claude is
 listening (claude-listen runs). A dot: Claude is speaking (claude-say runs).
-Click to bring Claude into the voice chat (claude-chat in a terminal) or to
-turn everything off. Starts with Claude-Voice off; it never turns it on by itself.
+Click to turn it on (claude-chat in a terminal) or off. Starts with
+Claude-Voice off; it never turns it on by itself.
 """
 
 import os
@@ -29,8 +29,8 @@ ORANGE = "#D97757"
 STATES = {
     # state: (icon color, icon opacity, tooltip)
     "off": ("#8a8a8a", 1.0, "Claude-Voice выключен"),
-    "on": (ORANGE, 0.55, "Claude-Voice включён, Claude не в чате"),
-    "listening": (ORANGE, 1.0, "Claude слушает голосовой чат"),
+    "on": (ORANGE, 0.55, "Claude-Voice включён, Claude не слушает"),
+    "listening": (ORANGE, 1.0, "Claude слушает"),
     "speaking": (ORANGE, 1.0, "Claude говорит"),
 }
 
@@ -116,7 +116,7 @@ class Tray:
         self.title.setEnabled(False)
         menu.addAction(self.title)
         menu.addSeparator()
-        self.join = menu.addAction("Зайти в голосовой чат", self.join_chat)
+        self.join = menu.addAction("Включить", self.join_chat)
         self.off = menu.addAction("Выключить", self.turn_off)
         menu.addSeparator()
         menu.addAction("Закрыть значок", app.quit)

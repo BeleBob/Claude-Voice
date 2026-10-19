@@ -116,7 +116,7 @@ in, while Claude-Voice itself stays off.
 | Icon | State |
 |---|---|
 | grey | off |
-| dim orange | devices on, Claude not in the chat |
+| dim orange | devices on, Claude not listening |
 | orange | Claude is listening (`claude-listen`) |
 | orange with a green dot | Claude is speaking (`claude-say`) |
 
