@@ -136,6 +136,15 @@ and speech synthesis add up.
 Recognition is local, but the transcribed speech of everyone in the channel is
 sent to Claude as part of the conversation. Tell the people in the channel.
 
+- While Claude-Voice is on, your microphone is transcribed all the time, even
+  outside a call. When it's off (grey icon) the microphone isn't recorded.
+- Claude gets phrases only while it listens (`claude-listen`): the phrase with
+  the wake word and the minute before it. Anything said more than two minutes
+  before `claude-listen` started doesn't count (`--max-age`), so an old
+  conversation won't surface the next time it starts.
+- The transcript is kept on disk for a day, then deleted
+  (`TRANSCRIPT_KEEP_HOURS`).
+
 ### Insult filter
 The filter runs in `claude-hear` before the transcript is written, so filtered
 speech never reaches the file, Claude or Anthropic's servers. The service

@@ -29,6 +29,10 @@ WAKE_WORDS=клод,клот,клоуд,клауд,claude,clot,cloud,clod
 VAD_THRESHOLD=500
 VAD_SILENCE_MS=800
 
+# Hours of transcript kept in ~/.local/state/claude-voice/transcript.jsonl;
+# older phrases are deleted. 0 keeps everything.
+TRANSCRIPT_KEEP_HOURS=24
+
 # Command that starts Claude Code for claude-chat and the tray. Aliases from
 # your interactive shell work too.
 CLAUDE_CMD=claude

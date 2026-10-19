@@ -48,6 +48,7 @@ DATA_DIR = os.path.join(
     os.environ.get("XDG_DATA_HOME", os.path.expanduser("~/.local/share")), "claude-voice"
 )
 FILTER_MODEL = os.path.join(DATA_DIR, "models", "toxicity")
+PRUNE_EVERY_S = 3600
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "lib"))
 
 
@@ -126,10 +127,42 @@ def load_filter(conf):
     return SpeechFilter(FILTER_MODEL, labels, float(conf.get("FILTER_THRESHOLD", "0.5")))
 
 
-def transcriber(phrases, url, language, speech_filter):
+def prune_transcript(keep_hours):
+    """Drop phrases older than keep_hours, so speech doesn't pile up on disk."""
+    cutoff = time.time() - keep_hours * 3600
+    try:
+        with open(TRANSCRIPT, encoding="utf-8") as f:
+            lines = f.readlines()
+    except FileNotFoundError:
+        return
+    kept = []
+    for line in lines:
+        try:
+            if json.loads(line)["ts"] >= cutoff:
+                kept.append(line)
+        except (ValueError, KeyError, TypeError):
+            continue
+    if len(kept) == len(lines):
+        return
+    tmp = TRANSCRIPT + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        f.writelines(kept)
+    os.replace(tmp, TRANSCRIPT)
+    print(f"claude-hear: pruned {len(lines) - len(kept)} old lines", flush=True)
+
+
+def transcriber(phrases, url, language, speech_filter, keep_hours):
     os.makedirs(STATE_DIR, exist_ok=True)
+    pruned_at = 0.0
     while True:
-        who, started, pcm = phrases.get()
+        # Pruning runs here, between writes, so it never races claude-hear itself.
+        if keep_hours > 0 and time.monotonic() - pruned_at >= PRUNE_EVERY_S:
+            prune_transcript(keep_hours)
+            pruned_at = time.monotonic()
+        try:
+            who, started, pcm = phrases.get(timeout=PRUNE_EVERY_S)
+        except queue.Empty:
+            continue
         try:
             text = transcribe(url, language, pcm).strip("«»\"' ")
         except Exception as e:  # keep listening if the server hiccups
@@ -206,6 +239,7 @@ def main():
             conf.get("WHISPER_URL", "http://127.0.0.1:8178/inference"),
             conf.get("LANGUAGE", "ru"),
             speech_filter,
+            float(conf.get("TRANSCRIPT_KEEP_HOURS", "24")),
         ),
         daemon=True,
     ).start()
